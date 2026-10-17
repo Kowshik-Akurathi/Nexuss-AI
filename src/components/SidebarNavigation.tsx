@@ -1,0 +1,22 @@
+"use client";
+
+import { PlusIcon } from "@/components/icons";
+
+interface SidebarNavigationProps {
+  onNewChat: () => void;
+}
+
+export default function SidebarNavigation({ onNewChat }: SidebarNavigationProps) {
+  return (
+    <nav className="shrink-0 px-3 pt-3" aria-label="Main navigation">
+<button
+  type="button"
+  onClick={onNewChat}
+  className="flex w-full items-center gap-2 rounded-xl text-foreground transition-all hover:bg-accent active:scale-[0.99] cursor-pointer"
+>
+  <PlusIcon className="h-3.5 w-3.5" />
+  <span>New chat</span>
+</button>
+    </nav>
+  );
+}
