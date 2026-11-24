@@ -4,3 +4,11 @@ dist/
 tsconfig.tsbuildinfo
 install.err
 install.log
+
+# Nexuss Lab / OpenCode migrated backend data (SQLite, audit log, scratch projects)
+.lab/
+
+# local env files
+.env
+.env.local
+.env.*.local

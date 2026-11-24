@@ -14,10 +14,11 @@ import { getErrorMessage } from "@/utils";
 import UsageDashboard from "@/components/UsageDashboard";
 import AccountPanel from "@/components/AccountPanel";
 import ModelsSettings from "@/components/ModelsSettings";
+import OpenCodeSettingsPanel from "@/opencode/components/OpenCodeSettingsPanel";
 
 type ApiKeyProvider = "groq" | "gemini" | "openrouter";
 
-export type SettingsTab = "general" | "account" | "keys" | "models" | "usage";
+export type SettingsTab = "general" | "account" | "keys" | "models" | "usage" | "agents";
 
 const KEY_FIELDS: ApiKeyProvider[] = ["groq", "gemini", "openrouter"];
 
@@ -234,6 +235,17 @@ export default function SettingsContent({ initialTab = "general" }: SettingsCont
         >
           Usage
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("agents")}
+          className={`flex-1 rounded-lg py-1.5 font-mono text-[11px] font-medium transition-all ${
+            activeTab === "agents"
+              ? "bg-card text-foreground border border-border shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Agents
+        </button>
       </div>
 
       {/* TAB 1: PREFERENCES */}
@@ -419,6 +431,9 @@ export default function SettingsContent({ initialTab = "general" }: SettingsCont
           <UsageDashboard />
         </section>
       )}
+
+      {/* TAB 4: AGENTS — OpenCode runtime (migrated Nexuss Lab) */}
+      {activeTab === "agents" && <OpenCodeSettingsPanel />}
     </div>
   );
 }

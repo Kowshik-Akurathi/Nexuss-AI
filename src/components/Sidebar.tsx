@@ -8,6 +8,7 @@ import RenameModal from "@/components/RenameModal";
 import DeleteModal from "@/components/DeleteModal";
 import Settings, { SettingsTab } from "@/components/Settings";
 import SidebarNavigation from "@/components/SidebarNavigation";
+import OpenCodeNav from "@/components/OpenCodeNav";
 import RecentChats from "@/components/RecentChats";
 import UserProfile from "@/components/UserProfile";
 import {
@@ -147,6 +148,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <SidebarNavigation onNewChat={() => void handleNewChat()} />
+
+        <div className="mx-3 mt-3 h-px shrink-0 bg-border" />
+
+        <OpenCodeNav onNavigate={onClose} />
 
         <div className="mx-3 mt-3 h-px shrink-0 bg-border" />
 
