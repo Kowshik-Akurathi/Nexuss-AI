@@ -1,25 +1,22 @@
-import { ProviderType } from "./providers";
-
 export interface UsageRecord {
+  /** Stable provider message id, used to avoid recording a response twice. */
   id: string;
-  userId: string;
-  provider: ProviderType;
+  provider: string;
   model: string;
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
-  responseTime: number;
   timestamp: number;
-  success: boolean;
 }
 
 export interface ProviderSummary {
-  provider: ProviderType;
+  provider: string;
   requests: number;
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
-  avgResponseTime: number;
+  /** Retained for compatibility with older persisted/admin summaries. */
+  avgResponseTime?: number;
   models: Record<string, ModelSummary>;
 }
 
@@ -28,7 +25,8 @@ export interface ModelSummary {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
-  avgResponseTime: number;
+  /** Retained for compatibility with older persisted/admin summaries. */
+  avgResponseTime?: number;
 }
 
 export interface UsageSummary {

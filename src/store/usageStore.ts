@@ -1,135 +1,89 @@
 import { create } from "zustand";
-import type { ProviderType, UsageRecord, UsageSummary, ProviderSummary } from "@/types";
-import { MOCK_USAGE_SUMMARY } from "@/data/mockData";
+import type { UsageRecord, UsageSummary, ProviderSummary } from "@/types";
 
-/**
- * Mock usage store: keeps an in-memory list of requests so the Usage tab can
- * be exercised (including the "clear statistics" flow).
- */
+const STORAGE_KEY = "nexuss-usage-records";
 
 interface UsageStore {
   summary: UsageSummary;
   loading: boolean;
-  recordUsage: (entry: Omit<UsageRecord, "id" | "timestamp" | "userId">) => Promise<void>;
+  recordUsage: (entry: Omit<UsageRecord, "timestamp"> & { timestamp?: number }) => Promise<void>;
   loadSummary: () => Promise<void>;
-  getRecords: (provider?: ProviderType) => Promise<UsageRecord[]>;
+  getRecords: (provider?: string) => Promise<UsageRecord[]>;
   clearUsage: () => Promise<void>;
   resetUsage: () => void;
-  estimateContextTokens: (messages: { role: string; content: string }[]) => number;
 }
 
-function emptySummary(): UsageSummary {
-  return { providers: [], totalRequests: 0, totalTokens: 0 };
-}
+function emptySummary(): UsageSummary { return { providers: [], totalRequests: 0, totalTokens: 0 }; }
 
 function buildSummary(records: UsageRecord[]): UsageSummary {
-  const map = new Map<ProviderType, ProviderSummary>();
-  for (const r of records) {
-    let ps = map.get(r.provider);
-    if (!ps) {
-      ps = {
-        provider: r.provider,
-        requests: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-        avgResponseTime: 0,
-        models: {}
-      };
-      map.set(r.provider, ps);
+  const map = new Map<string, ProviderSummary>();
+  for (const record of records) {
+    let provider = map.get(record.provider);
+    if (!provider) {
+      provider = { provider: record.provider, requests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, models: {} };
+      map.set(record.provider, provider);
     }
-    ps.requests += 1;
-    ps.inputTokens += r.inputTokens;
-    ps.outputTokens += r.outputTokens;
-    ps.totalTokens += r.totalTokens;
-    ps.avgResponseTime =
-      (ps.avgResponseTime * (ps.requests - 1) + r.responseTime) / ps.requests;
-
-    const model = (ps.models[r.model] ??= {
-      requests: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-      avgResponseTime: 0
-    });
+    provider.requests += 1;
+    provider.inputTokens += record.inputTokens;
+    provider.outputTokens += record.outputTokens;
+    provider.totalTokens += record.totalTokens;
+    const model = (provider.models[record.model] ??= { requests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     model.requests += 1;
-    model.inputTokens += r.inputTokens;
-    model.outputTokens += r.outputTokens;
-    model.totalTokens += r.totalTokens;
-    model.avgResponseTime =
-      (model.avgResponseTime * (model.requests - 1) + r.responseTime) / model.requests;
+    model.inputTokens += record.inputTokens;
+    model.outputTokens += record.outputTokens;
+    model.totalTokens += record.totalTokens;
   }
   const providers = [...map.values()];
-  return {
-    providers,
-    totalRequests: records.length,
-    totalTokens: providers.reduce((n, p) => n + p.totalTokens, 0)
-  };
+  return { providers, totalRequests: records.length, totalTokens: providers.reduce((total, p) => total + p.totalTokens, 0) };
 }
 
 let records: UsageRecord[] = [];
-let seeded = false;
+let loaded = false;
 
-function seedRecords(): UsageRecord[] {
-  if (seeded) return records;
-  seeded = true;
-  // Flatten the fixture summary into pseudo records so clears rebuild cleanly.
-  const now = Date.now();
-  let i = 0;
-  records = MOCK_USAGE_SUMMARY.providers.flatMap((p) =>
-    Array.from({ length: Math.min(p.requests, 6) }).map((_, idx) => ({
-      id: `ur-${i++}`,
-      userId: "mock-uid-001",
-      provider: p.provider,
-      model: Object.keys(p.models)[idx % Object.keys(p.models).length],
-      inputTokens: Math.round(p.inputTokens / Math.min(p.requests, 6)),
-      outputTokens: Math.round(p.outputTokens / Math.min(p.requests, 6)),
-      totalTokens: Math.round(p.totalTokens / Math.min(p.requests, 6)),
-      responseTime: p.avgResponseTime,
-      timestamp: now - idx * 3_600_000,
-      success: true
-    }))
-  );
+function loadRecords(): UsageRecord[] {
+  if (loaded) return records;
+  loaded = true;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const parsed: unknown = stored ? JSON.parse(stored) : [];
+    records = Array.isArray(parsed) ? parsed as UsageRecord[] : [];
+  } catch { records = []; }
   return records;
 }
 
-export const useUsageStore = create<UsageStore>((set, get) => ({
-  summary: MOCK_USAGE_SUMMARY,
-  loading: false,
+function persistRecords(): void {
+  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); } catch { /* best effort */ }
+}
 
+export const useUsageStore = create<UsageStore>((set) => ({
+  summary: emptySummary(),
+  loading: false,
   loadSummary: async () => {
     set({ loading: true });
-    seedRecords();
+    loadRecords();
     set({ summary: buildSummary(records), loading: false });
   },
-
   recordUsage: async (entry) => {
-    const record: UsageRecord = {
-      ...entry,
-      id: `ur-${Date.now()}`,
-      userId: "mock-uid-001",
-      timestamp: Date.now()
-    };
-    records = [record, ...records];
+    loadRecords();
+    if (records.some((record) => record.id === entry.id)) return;
+    records = [{ ...entry, timestamp: entry.timestamp ?? Date.now() }, ...records];
+    persistRecords();
     set({ summary: buildSummary(records) });
   },
-
   getRecords: async (provider) => {
-    seedRecords();
-    return provider ? records.filter((r) => r.provider === provider) : records;
+    loadRecords();
+    return provider ? records.filter((record) => record.provider === provider) : records;
   },
-
   clearUsage: async () => {
+    loadRecords();
     records = [];
+    persistRecords();
     set({ summary: emptySummary() });
   },
-
   resetUsage: () => {
     records = [];
-    seeded = false;
-    set({ summary: MOCK_USAGE_SUMMARY });
-  },
-
-  estimateContextTokens: (messages) =>
-    messages.reduce((total, m) => total + Math.ceil(m.content.length / 4) + 3, 0)
+    loaded = true;
+    persistRecords();
+    set({ summary: emptySummary() });
+  }
 }));

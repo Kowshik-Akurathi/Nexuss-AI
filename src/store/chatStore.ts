@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type { Chat, Message, ProviderType, ChatState } from "@/types";
 import { generateTitle } from "@/utils/providerLabels";
 import { MOCK_REPLIES, initialChats, initialMessages, MOCK_USER } from "@/data/mockData";
-import { useUsageStore } from "@/store/usageStore";
 
 /**
  * Mock chat store.
@@ -272,11 +271,9 @@ type GetFn = () => ChatStore;
 /** Simulates a streamed assistant reply with realistic timing. */
 function streamReply(set: SetFn, get: GetFn, chatId: string, prompt: string): void {
   streamAbort = false;
-  const provider = get().provider;
   const model = get().model;
   const full = pickReply(prompt.length + model.length);
   const assistantId = newId();
-  const startedAt = Date.now();
 
   const pushAssistant = (content: string) => {
     const msg: Message = {
@@ -318,18 +315,9 @@ function streamReply(set: SetFn, get: GetFn, chatId: string, prompt: string): vo
 
     if (cursor >= full.length) {
       stopTimer();
-      const duration = Date.now() - startedAt;
       set({ isStreaming: false, streamingMessageId: null, loading: false });
-      const tokens = Math.round(full.length / 4);
-      void useUsageStore.getState().recordUsage({
-        provider,
-        model,
-        inputTokens: Math.round(prompt.length / 4),
-        outputTokens: tokens,
-        totalTokens: Math.round(prompt.length / 4) + tokens,
-        responseTime: duration,
-        success: true
-      });
+      // This prototype response does not include provider token metadata.
+      // Do not record character-length estimates as actual usage.
     }
   }, 26);
 }

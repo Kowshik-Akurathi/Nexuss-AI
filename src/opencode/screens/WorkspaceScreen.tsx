@@ -11,6 +11,7 @@ import { ResultsCard, FileList } from "../components/ResultsCard";
 import ScreenHeader from "../components/ScreenHeader";
 import { useViewStore } from "@/store/viewStore";
 import { XIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { useUsageStore } from "@/store/usageStore";
 import {
   applyTurnFrame,
   createTurnStream,
@@ -100,9 +101,19 @@ export default function WorkspaceScreen({ sidebarOpen, onToggleSidebar }: Worksp
       const d = (await r.json()) as {
         messages: ChatItem[];
         session: { agent?: string; model?: string; updatedAt?: number };
+        usage?: Array<{
+          id: string;
+          provider: string;
+          model: string;
+          inputTokens: number;
+          outputTokens: number;
+          totalTokens: number;
+          timestamp: number;
+        }>;
       };
       setMessages(d.messages ?? []);
       setSessionDetail(d.session ?? null);
+      for (const record of d.usage ?? []) void useUsageStore.getState().recordUsage(record);
       return d.messages ?? [];
     } catch {
       return null;

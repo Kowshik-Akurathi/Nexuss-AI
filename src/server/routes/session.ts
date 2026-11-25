@@ -13,12 +13,40 @@ export const GET = handler("session", async (req, _ctx) => {
 
   const includeHistory = new URL(req.url).searchParams.get("history") !== "0";
   let messages: unknown[] = [];
+  let usage: Array<{
+    id: string;
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    timestamp: number;
+  }> = [];
   if (includeHistory) {
     const bundles = await mgr.history(id, session.directory);
     messages = toChatItems(bundles);
+    usage = bundles.flatMap((bundle) => {
+      if (bundle.info.role !== "assistant") return [];
+      const tokens = bundle.info.tokens;
+      const input = tokens?.input;
+      const output = tokens?.output;
+      const provider = bundle.info.model?.providerID ?? bundle.info.providerID;
+      const model = bundle.info.model?.modelID ?? bundle.info.modelID;
+      // A response without provider token metadata is intentionally omitted.
+      if (!provider || !model || typeof input !== "number" || typeof output !== "number") return [];
+      return [{
+        id: bundle.info.id,
+        provider,
+        model,
+        inputTokens: input,
+        outputTokens: output,
+        totalTokens: input + output,
+        timestamp: bundle.info.time?.completed ?? bundle.info.time?.created ?? Date.now(),
+      }];
+    });
   }
   store().touchSession(id);
-  return json({ session, messages });
+  return json({ session, messages, usage });
 });
 
 export const PATCH = handler("session", async (req, _ctx) => {
